@@ -14,6 +14,7 @@ const pool = globalForPrisma.pgPool ?? new Pool({
     : { rejectUnauthorized: false },
 })
 
+
 if (process.env.NODE_ENV !== 'production') globalForPrisma.pgPool = pool
 
 const adapter = new PrismaPg(pool)
