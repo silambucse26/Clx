@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { formatDate, getArticleTypeLabel } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/index'
+import { SubmittedFilesCard } from '@/components/manuscripts/SubmittedFilesCard'
 import { TechnicalCheckForm } from '@/components/editorial/TechnicalCheckForm'
 import { ArrowLeft } from 'lucide-react'
 
@@ -22,6 +23,7 @@ export default async function TechnicalCheckPage({ params }: Props) {
       journal: { select: { title: true, abbreviation: true } },
       submitter: { select: { name: true, email: true, affiliation: true } },
       authors: true,
+      files: true,
     },
   })
 
@@ -89,6 +91,11 @@ export default async function TechnicalCheckPage({ params }: Props) {
               </div>
             </CardContent>
           </Card>
+
+          <div className="mt-5">
+            <SubmittedFilesCard files={manuscript.files} />
+          </div>
+
         </div>
 
         <div>

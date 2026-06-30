@@ -186,3 +186,63 @@ export async function getManuscriptDetail(id: string) {
     },
   })
 }
+
+export async function addManuscriptFile(data: {
+  manuscriptId: string
+  fileName: string
+  fileType: string
+  fileSize: number
+}) {
+  const session = await auth()
+  if (!session?.user) throw new Error('Not authenticated')
+
+  const fileUrl = `/api/files/${data.manuscriptId}_${Date.now()}_${encodeURIComponent(data.fileName)}`
+
+  const fileRecord = await prisma.manuscriptFile.create({
+    data: {
+      manuscriptId: data.manuscriptId,
+      fileName: data.fileName,
+      fileType: data.fileType,
+      fileUrl,
+      fileSize: data.fileSize,
+    }
+  })
+
+  revalidatePath(`/dashboard/author/submit?continue=${data.manuscriptId}`)
+  revalidatePath(`/dashboard/author/manuscripts/${data.manuscriptId}`)
+  revalidatePath(`/dashboard/editor/manuscripts/${data.manuscriptId}`)
+  revalidatePath(`/dashboard/office/manuscripts/${data.manuscriptId}`)
+  revalidatePath(`/dashboard/production/manuscripts/${data.manuscriptId}`)
+
+  return { success: true, file: fileRecord }
+}
+
+export async function deleteManuscriptFile(fileId: string, manuscriptId: string) {
+  const session = await auth()
+  if (!session?.user) throw new Error('Not authenticated')
+
+  await prisma.manuscriptFile.delete({
+    where: { id: fileId }
+  })
+
+  revalidatePath(`/dashboard/author/submit?continue=${manuscriptId}`)
+  revalidatePath(`/dashboard/author/manuscripts/${manuscriptId}`)
+  revalidatePath(`/dashboard/editor/manuscripts/${manuscriptId}`)
+  revalidatePath(`/dashboard/office/manuscripts/${manuscriptId}`)
+  revalidatePath(`/dashboard/production/manuscripts/${manuscriptId}`)
+
+  return { success: true }
+}
+
+export async function getManuscriptFiles(manuscriptId: string) {
+  const session = await auth()
+  if (!session?.user) throw new Error('Not authenticated')
+
+  const files = await prisma.manuscriptFile.findMany({
+    where: { manuscriptId },
+    orderBy: { uploadedAt: 'asc' }
+  })
+
+  return { success: true, files }
+}
+

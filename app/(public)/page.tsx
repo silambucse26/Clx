@@ -3,6 +3,8 @@ import Image from 'next/image'
 import { prisma } from '@/lib/prisma'
 import { formatDateShort } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { auth } from '@/lib/auth'
+import JoinTeamForm from '@/components/home/JoinTeamForm'
 import {
   ChevronRight,
   ChevronLeft,
@@ -15,6 +17,7 @@ import {
   Shield,
   Search,
   BookOpen,
+  FileText,
 } from 'lucide-react'
 import NewToCelxLibrary from '@/components/home/NewToCelxLibrary'
 import FeaturedAuthorsSection from '@/components/home/FeaturedAuthorsSection'
@@ -28,8 +31,21 @@ async function getHomeData() {
     orderBy: { createdAt: 'desc' },
     take: 3,
   })
-  return { announcements }
+
+  const publishedArticles = await prisma.article.findMany({
+    where: { isPublished: true },
+    orderBy: { publishedDate: 'desc' },
+    take: 4,
+    include: {
+      authors: true,
+      journal: { select: { title: true, abbreviation: true } },
+      manuscript: { select: { manuscriptId: true } },
+    },
+  })
+
+  return { announcements, publishedArticles }
 }
+
 
 const subjects = [
   { label: 'Medical & Clinical Microbiology', icon: Bug, color: 'text-red-500 bg-red-50 border-red-100', desc: 'Pathogenic agents, diagnostics & host-microbe interactions.' },
@@ -76,7 +92,9 @@ const visualCards = [
 ]
 
 export default async function HomePage() {
-  const { announcements } = await getHomeData()
+  const session = await auth()
+  const { announcements, publishedArticles } = await getHomeData()
+
 
   // Fallback news data aligned with the mockup - Rebranded to CELX
   const newsList = [
@@ -169,7 +187,87 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ==================== OPEN ACCESS KEY WORKS (RECENT ARTICLES) ==================== */}
+      <section className="py-16 bg-slate-50 border-t border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+            <div>
+              <span className="text-xs font-bold text-teal-650 bg-teal-50 border border-teal-150 px-2.5 py-1 rounded uppercase tracking-wider">Open Access</span>
+              <h2 className="text-2xl md:text-3xl font-black text-navy-950 uppercase tracking-widest mt-2">Key Works & Research</h2>
+              <p className="text-slate-500 text-xs md:text-sm mt-1">Recently published open access research articles on CelX</p>
+            </div>
+            <Link href="/articles">
+              <Button className="bg-[#050c18] hover:bg-[#0b1626] text-white text-xs font-bold h-9 px-4 rounded cursor-pointer shrink-0">
+                Browse All Articles →
+              </Button>
+            </Link>
+          </div>
+
+          {publishedArticles.length === 0 ? (
+            <div className="bg-white border border-slate-150 rounded-2xl p-12 text-center text-slate-400 text-xs">
+              No published articles available yet.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {publishedArticles.map((article) => (
+                <div key={article.id} className="bg-white border border-slate-150 rounded-2xl p-6 hover:shadow-xl hover:border-teal-250 transition-all duration-300 flex flex-col justify-between group">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2.5 py-0.5 rounded border border-slate-150">
+                        {article.journal.abbreviation} · {article.articleType.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-[10px] text-slate-450 font-mono">
+                        {article.manuscript?.manuscriptId || `ART-${article.id.slice(-6).toUpperCase()}`}
+                      </span>
+                    </div>
+
+                    <h3 className="text-base font-black text-slate-900 leading-snug font-serif group-hover:text-teal-650 transition-colors">
+                      <Link href={`/articles/${article.slug}`}>
+                        {article.title}
+                      </Link>
+                    </h3>
+
+                    <p className="text-xs text-slate-500 font-medium">
+                      By {article.authors.map(a => a.name).join(', ')}
+                    </p>
+
+                    <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
+                      {article.abstract}
+                    </p>
+
+                    {article.keywords && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {article.keywords.split(',').map(k => k.trim()).filter(Boolean).slice(0, 4).map(kw => (
+                          <span key={kw} className="text-[9px] bg-teal-50/50 text-teal-800 border border-teal-100/50 px-2 py-0.5 rounded-full font-semibold">
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-450">
+                      Published {article.publishedDate ? new Date(article.publishedDate).toLocaleDateString() : new Date(article.createdAt).toLocaleDateString()}
+                    </span>
+                    <a
+                      href={`/api/articles/${article.slug}/pdf`}
+                      download
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-650 hover:text-teal-700 hover:underline cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      Download PDF
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* ==================== BOTTOM COLUMNS (AUTHORS, METRICS, NEWS - LARGE PRESENTATION FORMAT) ==================== */}
+
       <section className="py-16 max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-12 border-t border-slate-200/80">
         
         {/* Featured Authors (7 Columns - CLIENT INTERACTION EMBEDDED) */}
@@ -236,6 +334,7 @@ export default async function HomePage() {
       {/* New to CLEX Library section */}
       <NewToCelxLibrary />
       
+      {!session?.user && <JoinTeamForm />}
     </div>
   )
 }

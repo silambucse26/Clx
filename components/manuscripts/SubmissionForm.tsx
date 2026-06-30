@@ -5,8 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { Input, Textarea, Label, Select, Alert, Card, CardContent, CardHeader, CardTitle } from '@/components/ui/index'
-import { createDraftManuscript, updateManuscriptStep, submitManuscript } from '@/app/actions/manuscripts'
-import { CheckCircle2, ArrowLeft, ArrowRight, Send } from 'lucide-react'
+import { createDraftManuscript, updateManuscriptStep, submitManuscript, addManuscriptFile, deleteManuscriptFile, getManuscriptFiles } from '@/app/actions/manuscripts'
+import { CheckCircle2, ArrowLeft, ArrowRight, Send, Upload, File, Trash2, ShieldAlert } from 'lucide-react'
+
 
 interface Journal { id: string; title: string; abbreviation: string | null; subjectArea: string; slug: string }
 interface Props { journals: Journal[] }
@@ -55,6 +56,73 @@ export function SubmissionForm({ journals }: Props) {
     waiverReason: '',
   })
 
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{ id: string; fileName: string; fileType: string; fileSize: number | null }>>([])
+
+  useEffect(() => {
+    if (currentStep === 7 && manuscriptDbId) {
+      getManuscriptFiles(manuscriptDbId).then((res) => {
+        if (res.success && res.files) {
+          setUploadedFiles(res.files)
+        }
+      })
+    }
+  }, [currentStep, manuscriptDbId])
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fileType: string) => {
+    const file = e.target.files?.[0]
+    if (!file || !manuscriptDbId) return
+    setError('')
+    setIsLoading(true)
+
+    try {
+      const res = await addManuscriptFile({
+        manuscriptId: manuscriptDbId,
+        fileName: file.name,
+        fileType,
+        fileSize: file.size,
+      })
+
+      if (res.success && res.file) {
+        setUploadedFiles((prev) => [...prev, {
+          id: res.file.id,
+          fileName: res.file.fileName,
+          fileType: res.file.fileType,
+          fileSize: res.file.fileSize
+        }])
+      }
+    } catch (err) {
+      setError('Failed to upload file.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleFileDelete = async (fileId: string) => {
+    if (!manuscriptDbId) return
+    setError('')
+    setIsLoading(true)
+
+    try {
+      const res = await deleteManuscriptFile(fileId, manuscriptDbId)
+      if (res.success) {
+        setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId))
+      }
+    } catch (err) {
+      setError('Failed to delete file.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const formatBytes = (bytes?: number | null) => {
+    if (!bytes) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+
   const selectedJournal = journals.find(j => j.id === formData.journalId)
 
   const handleNext = async () => {
@@ -78,6 +146,15 @@ export function SubmissionForm({ journals }: Props) {
         setError('Please add at least one keyword')
         return
       }
+      if (currentStep === 7) {
+        const hasManuscript = uploadedFiles.some((f) => f.fileType === 'manuscript')
+        if (!hasManuscript) {
+          setError('Please upload at least the primary Manuscript File (DOCX/PDF) before proceeding.')
+          setIsLoading(false)
+          return
+        }
+      }
+
 
       // Create draft on first step completion
       if (currentStep === 1 && !manuscriptDbId) {
@@ -270,25 +347,70 @@ export function SubmissionForm({ journals }: Props) {
 
           {/* Step 7: Files */}
           {currentStep === 7 && (
-            <div className="space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
-                <strong>File Upload:</strong> This is a placeholder. In production, you would upload your manuscript file (DOCX/PDF), figures, tables, and supplementary materials.
-              </div>
-              {[
-                { label: 'Manuscript File (DOCX/PDF) *', id: 'file-manuscript', required: true },
-                { label: 'Figures (PDF/PNG/TIFF)', id: 'file-figures', required: false },
-                { label: 'Tables (DOCX/XLSX)', id: 'file-tables', required: false },
-                { label: 'Supplementary Materials', id: 'file-supplementary', required: false },
-              ].map(file => (
-                <div key={file.id}>
-                  <Label htmlFor={file.id}>{file.label}</Label>
-                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center text-sm text-slate-400 cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
-                    Click to upload or drag and drop (placeholder)
-                  </div>
+            <div className="space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800 flex items-start gap-2">
+                <ShieldAlert className="w-5 h-5 shrink-0 text-blue-600 mt-0.5" />
+                <div>
+                  <strong>Manuscript Files:</strong> Please upload your primary manuscript document (DOCX or PDF is required). You may optionally upload figures, tables, and supplementary files.
                 </div>
-              ))}
+              </div>
+
+              {[
+                { label: 'Manuscript File (DOCX/PDF) *', id: 'manuscript', required: true },
+                { label: 'Figures (PDF/PNG/TIFF)', id: 'figures', required: false },
+                { label: 'Tables (DOCX/XLSX)', id: 'tables', required: false },
+                { label: 'Supplementary Materials', id: 'supplementary', required: false },
+              ].map(slot => {
+                const slotFiles = uploadedFiles.filter(f => f.fileType === slot.id)
+                return (
+                  <div key={slot.id} className="space-y-2 border border-slate-150 rounded-xl p-4 bg-slate-50/50">
+                    <Label className="text-sm font-bold text-slate-800">{slot.label}</Label>
+                    
+                    {/* Upload button area */}
+                    <div className="relative">
+                      <input
+                        type="file"
+                        id={`file-input-${slot.id}`}
+                        onChange={(e) => handleFileUpload(e, slot.id)}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById(`file-input-${slot.id}`)?.click()}
+                        className="w-full border-2 border-dashed border-slate-350 rounded-lg py-5 text-center text-xs text-slate-500 cursor-pointer hover:border-teal-400 hover:bg-teal-50/20 transition-all flex flex-col items-center justify-center gap-1.5"
+                      >
+                        <Upload className="w-5 h-5 text-slate-400" />
+                        <span>Select file to upload</span>
+                      </button>
+                    </div>
+
+                    {/* Files list */}
+                    {slotFiles.length > 0 && (
+                      <div className="space-y-1.5 pt-2">
+                        {slotFiles.map(file => (
+                          <div key={file.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700">
+                            <div className="flex items-center gap-2 truncate">
+                              <File className="w-4 h-4 text-slate-450 shrink-0" />
+                              <span className="font-semibold truncate text-slate-900">{file.fileName}</span>
+                              <span className="text-[10px] text-slate-400 shrink-0">({formatBytes(file.fileSize)})</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleFileDelete(file.id)}
+                              className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
+
 
           {/* Step 8: Cover Letter */}
           {currentStep === 8 && (

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { getStatusColor, getStatusLabel, getArticleTypeLabel } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/index'
+import { SubmittedFilesCard } from '@/components/manuscripts/SubmittedFilesCard'
 import { PublishForm } from '@/components/production/PublishForm'
 import { ArrowLeft, FileText, CheckCircle } from 'lucide-react'
 
@@ -23,6 +24,7 @@ export default async function ProductionManuscriptPage({ params }: Props) {
         journal: { select: { title: true, abbreviation: true, id: true } },
         submitter: { select: { name: true, email: true } },
         authors: true,
+        files: true,
       },
     }),
     prisma.volume.findMany({
@@ -98,6 +100,9 @@ export default async function ProductionManuscriptPage({ params }: Props) {
               </div>
             </CardContent>
           </Card>
+
+          <SubmittedFilesCard files={manuscript.files} />
+
         </div>
 
         {/* Right side: publish form */}

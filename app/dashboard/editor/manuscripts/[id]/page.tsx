@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { formatDate, getStatusColor, getStatusLabel } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/index'
+import { SubmittedFilesCard } from '@/components/manuscripts/SubmittedFilesCard'
 import { InviteReviewerForm, EditorialDecisionForm } from '@/components/editorial/EditorForms'
 import { ArrowLeft } from 'lucide-react'
 
@@ -22,6 +23,7 @@ export default async function EditorManuscriptPage({ params }: Props) {
       include: {
         journal: { select: { title: true, abbreviation: true } },
         submitter: { select: { name: true, email: true } },
+        files: true,
         reviewerInvitations: {
           include: { reviewer: { select: { name: true, email: true } } },
           orderBy: { createdAt: 'desc' },
@@ -84,6 +86,10 @@ export default async function EditorManuscriptPage({ params }: Props) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Submitted Files */}
+          <SubmittedFilesCard files={manuscript.files} />
+
 
           {/* Reviews */}
           {manuscript.reviews.length > 0 && (

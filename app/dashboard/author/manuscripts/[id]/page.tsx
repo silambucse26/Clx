@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { formatDate, getStatusColor, getStatusLabel, getArticleTypeLabel, getLicenseLabel } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/index'
+import { SubmittedFilesCard } from '@/components/manuscripts/SubmittedFilesCard'
 import { ArrowLeft, CheckCircle2, Circle } from 'lucide-react'
 
 const statusFlow = [
@@ -36,6 +37,7 @@ export default async function ManuscriptDetailPage({ params }: Props) {
     include: {
       journal: { select: { title: true, abbreviation: true, slug: true } },
       authors: true,
+      files: true,
       editorialDecisions: {
         include: { editor: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
@@ -119,6 +121,10 @@ export default async function ManuscriptDetailPage({ params }: Props) {
               )}
             </CardContent>
           </Card>
+
+          {/* Submitted Files */}
+          <SubmittedFilesCard files={manuscript.files} />
+
 
           {/* Editorial Decision */}
           {manuscript.editorialDecisions.length > 0 && (

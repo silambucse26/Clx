@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  experimental: {
+    workerThreads: false,
+    cpus: 1
+  }
 };
 
 export default nextConfig;
